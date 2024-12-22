@@ -4,6 +4,7 @@ from medical_analyzer import MedicalReportAnalyzer
 from medical_chat import MedicalChatAnalyzer
 import pdfplumber
 import io
+import asyncio
 
 app = FastAPI()
 
@@ -23,17 +24,15 @@ chat_analyzer = MedicalChatAnalyzer()
 @app.post("/api/analyze-report")
 async def analyze_report(file: UploadFile = File(...)):
     try:
-        # Read the uploaded PDF
         contents = await file.read()
         
-        # Extract text from PDF
         text = ""
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             for page in pdf.pages:
                 text += page.extract_text() or ""
 
-        # Analyze the medical report
-        analysis_results = report_analyzer.analyze(text)
+        # Analyze the medical report (now async)
+        analysis_results = await report_analyzer.analyze(text)
         
         return {
             "success": True,

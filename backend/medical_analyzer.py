@@ -1,6 +1,8 @@
 import torch
 import concurrent.futures
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForTokenClassification, pipeline
+import time
+import asyncio
 
 class MedicalReportAnalyzer:
     def __init__(self):
@@ -25,6 +27,8 @@ class MedicalReportAnalyzer:
         
         # Only initialize summarizer if needed (it's the heaviest model)
         self._lazy_summarizer = None
+
+        self.current_progress = 0
 
     def _setup_clinical_bert(self):
         model_name = "medicalai/ClinicalBERT"
@@ -75,42 +79,66 @@ class MedicalReportAnalyzer:
             'confidence': matches / len(medical_indicators)
         }
 
-    def analyze(self, text):
-        # First validate if this looks like a medical report (fast check)
-        validation = self._validate_medical_content(text)
-        if not validation['is_medical']:
-            return {
-                "error": "This document doesn't appear to be a medical report",
-                "confidence": validation['confidence'],
-                "is_medical_report": False
+    async def _update_progress(self, target_percent, duration):
+        """Smoothly update progress in 0.1% increments"""
+        start_percent = self.current_progress
+        steps = int((target_percent - start_percent) * 10)  # 0.1% increments
+        
+        if steps > 0:
+            for i in range(steps):
+                self.current_progress = start_percent + (i + 1) * 0.1
+                await asyncio.sleep(duration / steps)
+
+    async def analyze(self, text):
+        try:
+            # Initialize progress
+            self.current_progress = 0
+            progress = {
+                "status": "Starting analysis",
+                "percent": self.current_progress
             }
 
-        try:
-            # Limit text length for faster processing
+            # Validate medical content (0-10%)
+            await self._update_progress(5, 1)  # First 5%
+            validation = self._validate_medical_content(text)
+            await self._update_progress(10, 1)  # Up to 10%
+            
+            if not validation['is_medical']:
+                return {
+                    "error": "This document doesn't appear to be a medical report",
+                    "confidence": validation['confidence'],
+                    "is_medical_report": False,
+                    "progress": {"status": "Not a medical report", "percent": self.current_progress}
+                }
+
+            # Process text (10-20%)
             max_length = 512
             truncated_text = ' '.join(text.split()[:max_length])
+            await self._update_progress(20, 2)
 
-            # Run classification and NER in parallel
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future_classification = executor.submit(
-                    self.clinical_bert, truncated_text
-                )
-                future_entities = executor.submit(
-                    self.ner_model, truncated_text
-                )
+            # Classification (20-40%)
+            await self._update_progress(30, 2)
+            classification = self.clinical_bert(truncated_text)[0]
+            await self._update_progress(40, 2)
 
-                classification = future_classification.result()[0]
-                entities = future_entities.result()
+            # NER (40-60%)
+            await self._update_progress(50, 2)
+            entities = self.ner_model(truncated_text)
+            await self._update_progress(60, 2)
 
-            # Only generate summary if needed (it's the slowest part)
+            # Summary generation (60-90%)
+            await self._update_progress(70, 2)
             summary = self.summarizer(
                 truncated_text,
                 max_length=150,
                 min_length=50,
                 do_sample=False
             )[0]['summary_text'] if len(text) > 200 else text
+            
+            await self._update_progress(90, 2)
 
-            return {
+            # Finalize results (90-100%)
+            result = {
                 "is_medical_report": True,
                 "classification": {
                     "label": classification["label"],
@@ -121,14 +149,20 @@ class MedicalReportAnalyzer:
                 "recommendations": self._generate_recommendations(
                     classification, 
                     entities
-                )
+                ),
+                "progress": {"status": "Complete", "percent": 100}
             }
+            
+            await self._update_progress(100, 1)
+            return result
+
         except Exception as e:
             print(f"Error during analysis: {str(e)}")
             return {
                 "error": "Error analyzing the document",
                 "details": str(e),
-                "is_medical_report": False
+                "is_medical_report": False,
+                "progress": {"status": "Error", "percent": self.current_progress}
             }
 
     def _process_entities(self, entities):

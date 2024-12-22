@@ -8,6 +8,7 @@ function UploadReport() {
   const [error, setError] = useState(null);
   const [question, setQuestion] = useState('');
   const [chatResponse, setChatResponse] = useState(null);
+  const [progress, setProgress] = useState({ status: '', percent: 0 });
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -23,6 +24,7 @@ function UploadReport() {
 
     setUploadStatus('uploading');
     setError(null);
+    setProgress({ status: 'Starting upload', percent: 0 });
 
     try {
       const formData = new FormData();
@@ -34,12 +36,21 @@ function UploadReport() {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
+          onUploadProgress: (progressEvent) => {
+            const uploadPercent = (progressEvent.loaded / progressEvent.total) * 5;
+            setProgress(prev => ({
+              ...prev,
+              status: 'Uploading file',
+              percent: uploadPercent
+            }));
+          }
         }
       );
 
       if (response.data.success) {
         if (response.data.analysis.is_medical_report) {
           setAnalysis(response.data.analysis);
+          setProgress(response.data.analysis.progress);
           setUploadStatus('success');
         } else {
           setError(response.data.analysis.error);
@@ -98,7 +109,15 @@ function UploadReport() {
       {uploadStatus === 'uploading' && (
         <div className="loading-animation">
           <div className="spinner"></div>
-          <div className="loading-text">Analyzing your medical report...</div>
+          <div className="loading-text">
+            {progress.status}... ({progress.percent}%)
+          </div>
+          <div className="progress-bar">
+            <div 
+              className="progress-bar-fill" 
+              style={{ width: `${progress.percent}%` }}
+            ></div>
+          </div>
         </div>
       )}
 
