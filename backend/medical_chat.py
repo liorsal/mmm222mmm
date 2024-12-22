@@ -3,18 +3,20 @@ import torch
 
 class MedicalChatAnalyzer:
     def __init__(self):
-        # Use a smaller, medical-focused model that can run locally
+        # Check for MPS availability
+        self.device = (
+            "mps" if torch.backends.mps.is_available() 
+            else "cuda" if torch.cuda.is_available() 
+            else "cpu"
+        )
+        print(f"Using device: {self.device}")
+
         self.model_name = "samwalton/biobert-base-cased-v1.2"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.model = AutoModelForQuestionAnswering.from_pretrained(self.model_name)
+        self.model = self.model.to(self.device)  # Move model to GPU
         
         try:
-            # Initialize the model and tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModelForQuestionAnswering.from_pretrained(self.model_name)
-            
-            # Move to GPU if available
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-            self.model.to(self.device)
-            
             # Create QA pipeline
             self.qa_pipeline = pipeline(
                 "question-answering",

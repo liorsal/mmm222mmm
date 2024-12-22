@@ -96,7 +96,10 @@ function UploadReport() {
       </div>
 
       {uploadStatus === 'uploading' && (
-        <div className="status-message uploading">Analyzing your report...</div>
+        <div className="loading-animation">
+          <div className="spinner"></div>
+          <div className="loading-text">Analyzing your medical report...</div>
+        </div>
       )}
 
       {error && (
