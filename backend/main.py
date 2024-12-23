@@ -1,7 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-import subprocess
-import json
+import re
+from difflib import get_close_matches
+import pdfplumber
+from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
+import io
 
 app = FastAPI()
 
@@ -14,37 +17,136 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/api/chat")
-async def chat(request: dict):
-    try:
-        message = request.get("message", "")
+# Initialize model at startup
+print("Loading biomedical NER model...")
+model_name = "d4data/biomedical-ner-all"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForTokenClassification.from_pretrained(model_name)
+ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+print("Model loaded successfully")
+
+def load_reference_ranges():
+    return {
+        "Alanine aminotransferase (ALT)": {"range": (10, 40), "unit": "U/L"},
+        "Albumin": {"range": (3.5, 5), "unit": "g/dL"},
+        "Potassium": {"range": (3.5, 5.0), "unit": "mEq/L"},
+        "Sodium": {"range": (136, 142), "unit": "mEq/L"},
+        "Hemoglobin": {"range": (12, 18), "unit": "g/dL"},
+        "Glucose": {"range": (70, 110), "unit": "mg/dL"},
+    }
+
+def extract_text_from_pdf(file_content):
+    with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+        return "\n".join(page.extract_text() for page in pdf.pages)
+
+def analyze_text(text, batch_size=512):
+    chunks = [text[i:i + batch_size] for i in range(0, len(text), batch_size)]
+    return [entity for chunk in chunks for entity in ner_pipeline(chunk)]
+
+def simplify_results(ner_results):
+    tests = []
+    test = {}
+
+    for entity in ner_results:
+        if entity["entity_group"] == "Diagnostic_procedure":
+            if test:
+                tests.append(test)
+            test = {"Test Name": entity["word"]}
+        elif entity["entity_group"] == "Lab_value":
+            test["Value"] = entity["word"]
+        elif entity["entity_group"] == "Unit":
+            test["Unit"] = entity["word"]
+    if test:
+        tests.append(test)
+    return tests
+
+def find_closest_match(name, reference_ranges):
+    matches = get_close_matches(name, reference_ranges.keys(), n=1, cutoff=0.7)
+    return matches[0] if matches else None
+
+def evaluate_tests(tests, reference_ranges):
+    status = "Good"
+    abnormal_tests = []
+    normal_tests = []
+
+    for test in tests:
+        name = test.get("Test Name", "").strip()
+        value = test.get("Value", "").strip()
+        unit = test.get("Unit", "").strip()
         
-        # Create prompt with medical context
-        prompt = f"""You are a helpful medical AI assistant. You can provide general health information but always remind users to consult healthcare professionals for medical advice.
+        matched_name = find_closest_match(name, reference_ranges)
+        if matched_name:
+            ref_range = reference_ranges[matched_name]["range"]
+            ref_unit = reference_ranges[matched_name]["unit"]
 
-User: {message}
-Assistant: """
+            try:
+                values = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", value)))
+                if values:
+                    if len(values) == 1 and not (ref_range[0] <= values[0] <= ref_range[1]):
+                        status = "Bad"
+                        abnormal_tests.append({
+                            "test": name,
+                            "value": value,
+                            "unit": unit,
+                            "range": f"{ref_range[0]}-{ref_range[1]} {ref_unit}"
+                        })
+                    elif len(values) == 2 and not (ref_range[0] <= values[0] <= ref_range[1] and ref_range[0] <= values[1] <= ref_range[1]):
+                        status = "Bad"
+                        abnormal_tests.append({
+                            "test": name,
+                            "value": f"{values[0]}-{values[1]}",
+                            "unit": unit,
+                            "range": f"{ref_range[0]}-{ref_range[1]} {ref_unit}"
+                        })
+                    else:
+                        normal_tests.append({
+                            "test": name,
+                            "value": value,
+                            "unit": unit,
+                            "range": f"{ref_range[0]}-{ref_range[1]} {ref_unit}"
+                        })
+            except ValueError:
+                print(f"Error parsing value for {name}: {value}")
 
-        # Call Ollama
-        process = subprocess.Popen(
-            ["ollama", "run", "llama2", prompt],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
+    return {
+        "status": status,
+        "abnormal_tests": abnormal_tests,
+        "normal_tests": normal_tests
+    }
 
-        # Get the response
-        output, error = process.communicate()
-
-        if error:
-            print(f"Ollama error: {error}")
-            return {"error": "Failed to generate response"}
-
-        return {"response": output.strip()}
-
+@app.post("/api/analyze-report")
+async def analyze_report(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        
+        # Extract text from PDF
+        text = extract_text_from_pdf(contents)
+        
+        # Analyze with NER
+        ner_results = analyze_text(text)
+        
+        # Simplify results
+        tests = simplify_results(ner_results)
+        
+        # Load reference ranges
+        reference_ranges = load_reference_ranges()
+        
+        # Evaluate test results
+        evaluation = evaluate_tests(tests, reference_ranges)
+        
+        return {
+            "success": True,
+            "text": text,
+            "results": tests,
+            "evaluation": evaluation
+        }
+        
     except Exception as e:
         print(f"Error: {str(e)}")
-        return {"error": str(e)}
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn
