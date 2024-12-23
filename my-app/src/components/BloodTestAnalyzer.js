@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { testCategories } from '../data/testCategories';
 
+const API_URL = process.env.REACT_APP_API_URL || 'https://your-cloud-run-url';
+
 function BloodTestAnalyzer() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [analysis, setAnalysis] = useState(null);
@@ -29,7 +31,7 @@ function BloodTestAnalyzer() {
       formData.append('file', file);
 
       const response = await axios.post(
-        'http://localhost:8000/api/analyze-report',
+        `${API_URL}/api/analyze-report`,
         formData,
         {
           headers: {
