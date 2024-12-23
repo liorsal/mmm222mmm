@@ -1,26 +1,24 @@
+import React from 'react';
 import './App.css';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import UploadReport from './components/UploadReport';
+import Chat from './components/Chat';
 import Insights from './components/Insights';
-import Overview from './components/Overview';
 
 function App() {
   return (
     <Router>
       <div className="App">
         <header className="App-header">
-          <h1>Personal Health Report Analysis</h1>
+          <h1>Medical AI Assistant</h1>
           <nav>
-            <a href="/">Home</a>
-            <a href="/upload">Upload Report</a>
+            <a href="/">Chat</a>
             <a href="/insights">Insights</a>
           </nav>
         </header>
         <main>
           <Routes>
-            <Route path="/upload" element={<UploadReport />} />
             <Route path="/insights" element={<Insights />} />
-            <Route path="/" element={<Overview />} />
+            <Route path="/" element={<Chat />} />
           </Routes>
         </main>
       </div>

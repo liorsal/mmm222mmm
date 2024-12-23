@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-function UploadReport() {
+function UploadReport({ onUpload }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState('');
   const [analysis, setAnalysis] = useState(null);
@@ -22,6 +22,11 @@ function UploadReport() {
       return;
     }
 
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('File too large. Please upload a smaller file (max 10MB).');
+      return;
+    }
+
     setUploadStatus('uploading');
     setError(null);
     setProgress({ status: 'Starting upload', percent: 0 });
@@ -30,18 +35,20 @@ function UploadReport() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await axios.post('http://localhost:8000/api/analyze-report', 
+      const response = await axios.post(
+        'http://localhost:8000/api/analyze-report', 
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
+          timeout: 600000,  // 10 minutes timeout
           onUploadProgress: (progressEvent) => {
             const uploadPercent = (progressEvent.loaded / progressEvent.total) * 5;
             setProgress(prev => ({
               ...prev,
               status: 'Uploading file',
-              percent: uploadPercent
+              percent: Math.min(uploadPercent, 5)
             }));
           }
         }
@@ -52,6 +59,11 @@ function UploadReport() {
           setAnalysis(response.data.analysis);
           setProgress(response.data.analysis.progress);
           setUploadStatus('success');
+          
+          onUpload({
+            name: selectedFile.name,
+            analysis: response.data.analysis
+          });
         } else {
           setError(response.data.analysis.error);
           setUploadStatus('error');
@@ -60,7 +72,11 @@ function UploadReport() {
         throw new Error(response.data.error);
       }
     } catch (error) {
-      setError(error.message);
+      setError(
+        error.code === 'ECONNABORTED' 
+          ? 'Request timed out. The file might be too large or the server is busy.'
+          : error.message
+      );
       setUploadStatus('error');
       console.error(error);
     }
