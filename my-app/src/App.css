@@ -17,6 +17,7 @@ body {
   color: var(--text-light);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  direction: rtl;
 }
 
 .App {
@@ -484,4 +485,69 @@ tr.abnormal td {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* RTL Support */
+body {
+  direction: rtl;
+}
+
+/* Categories Grid */
+.test-categories {
+  margin: 2rem 0;
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+}
+
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.category-card {
+  background: rgba(45, 45, 45, 0.5);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.category-card h4 {
+  color: var(--primary-blue);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+
+.category-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.category-card li {
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.category-card li:last-child {
+  border-bottom: none;
+}
+
+/* RTL specific adjustments */
+.file-upload button svg,
+.status-icon,
+.error-message svg {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+.table-container {
+  direction: rtl;
+}
+
+th, td {
+  text-align: right;
 }

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import { testCategories } from '../data/testCategories';
 
 function BloodTestAnalyzer() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -59,14 +60,30 @@ function BloodTestAnalyzer() {
   return (
     <div className="analyzer-container">
       <section className="hero-section">
-        <h2>Fast, Accurate Blood Test Analysis</h2>
-        <p className="subtitle">Upload your blood test PDF and get instant insights</p>
+        <h2>אנליזת בדיקות דם מהירה ומדויקת</h2>
+        <p className="subtitle">העלה את קובץ בדיקת הדם שלך וקבל תובנות מיידיות</p>
+      </section>
+
+      <section className="test-categories">
+        <h3>בדיקות שניתן לנתח</h3>
+        <div className="categories-grid">
+          {Object.entries(testCategories).map(([key, category]) => (
+            <div key={key} className="category-card">
+              <h4>{category.title}</h4>
+              <ul>
+                {category.tests.map((test, index) => (
+                  <li key={index}>{test}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="upload-card">
         <div className="upload-section">
-          <h2>Upload Blood Test PDF</h2>
-          <p className="subtitle">Click the button below to upload your file</p>
+          <h2>העלאת קובץ PDF של בדיקת דם</h2>
+          <p className="subtitle">לחץ על הכפתור להעלאת הקובץ</p>
           
           <div className="file-upload">
             <input
@@ -88,7 +105,7 @@ function BloodTestAnalyzer() {
                   <svg className="spinner" viewBox="0 0 50 50">
                     <circle cx="25" cy="25" r="20" fill="none" strokeWidth="5"></circle>
                   </svg>
-                  Analyzing...
+                  מנתח...
                 </>
               ) : (
                 <>
@@ -97,7 +114,7 @@ function BloodTestAnalyzer() {
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  Upload PDF File
+                  העלאת קובץ PDF
                 </>
               )}
             </button>
@@ -128,7 +145,7 @@ function BloodTestAnalyzer() {
 
       {analysis && (
         <section className="results-card">
-          <h3>Analysis Results</h3>
+          <h3>תוצאות הניתוח</h3>
           
           <div className={`status-card ${analysis.evaluation.status.toLowerCase()}`}>
             <div className="status-icon">
@@ -146,21 +163,23 @@ function BloodTestAnalyzer() {
               )}
             </div>
             <div className="status-text">
-              <h4>Overall Status</h4>
-              <p className="status-result">{analysis.evaluation.status}</p>
+              <h4>סטטוס כללי</h4>
+              <p className="status-result">
+                {analysis.evaluation.status === 'Good' ? 'תקין' : 'דורש בדיקה'}
+              </p>
             </div>
           </div>
 
           <div className="all-results">
-            <h4>All Test Results</h4>
+            <h4>כל תוצאות הבדיקות</h4>
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
-                    <th>Test</th>
-                    <th>Value</th>
-                    <th>Unit</th>
-                    <th>Status</th>
+                    <th>בדיקה</th>
+                    <th>ערך</th>
+                    <th>יחידות</th>
+                    <th>סטטוס</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,8 +192,7 @@ function BloodTestAnalyzer() {
                         <td>{result.Unit}</td>
                         <td>
                           <span className={`status-indicator ${status}`}>
-                            {status === 'normal' ? '✓' : '⚠'}
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status === 'normal' ? '✓ תקין' : '⚠ חריג'}
                           </span>
                         </td>
                       </tr>
@@ -188,7 +206,7 @@ function BloodTestAnalyzer() {
       )}
 
       <footer className="disclaimer">
-        <p>This tool is for informational purposes only. Always consult a healthcare provider.</p>
+        <p>כלי זה הוא למטרות מידע בלבד. יש להתייעץ תמיד עם ספק שירותי בריאות.</p>
       </footer>
     </div>
   );

@@ -33,6 +33,43 @@ def load_reference_ranges():
         "Sodium": {"range": (136, 142), "unit": "mEq/L"},
         "Hemoglobin": {"range": (12, 18), "unit": "g/dL"},
         "Glucose": {"range": (70, 110), "unit": "mg/dL"},
+        "White Blood Cell (WBC)": {"range": (4.5, 11.0), "unit": "K/µL"},
+        "Red Blood Cell (RBC)": {"range": (4.5, 5.9), "unit": "M/µL"},
+        "Platelet Count": {"range": (150, 450), "unit": "K/µL"},
+        "Total Cholesterol": {"range": (125, 200), "unit": "mg/dL"},
+        "HDL Cholesterol": {"range": (40, 60), "unit": "mg/dL"},
+        "LDL Cholesterol": {"range": (0, 100), "unit": "mg/dL"},
+        "Triglycerides": {"range": (0, 150), "unit": "mg/dL"},
+        "Creatinine": {"range": (0.6, 1.2), "unit": "mg/dL"},
+        "BUN (Blood Urea Nitrogen)": {"range": (7, 20), "unit": "mg/dL"},
+        "AST (Aspartate Aminotransferase)": {"range": (10, 40), "unit": "U/L"},
+        "Alkaline Phosphatase": {"range": (44, 147), "unit": "U/L"},
+        "Total Bilirubin": {"range": (0.3, 1.2), "unit": "mg/dL"},
+        "TSH (Thyroid Stimulating Hormone)": {"range": (0.4, 4.0), "unit": "mIU/L"},
+        "T4 (Thyroxine)": {"range": (4.5, 11.2), "unit": "µg/dL"},
+        "HbA1c (Hemoglobin A1c)": {"range": (4.0, 5.6), "unit": "%"},
+        "Fasting Blood Sugar": {"range": (70, 100), "unit": "mg/dL"},
+        "Calcium": {"range": (8.5, 10.5), "unit": "mg/dL"},
+        "Magnesium": {"range": (1.7, 2.2), "unit": "mg/dL"},
+        "Chloride": {"range": (96, 106), "unit": "mEq/L"},
+    }
+
+def load_test_metadata():
+    return {
+        "categories": {
+            "blood_count": ["WBC", "RBC", "Hemoglobin", "Platelet Count"],
+            "lipids": ["Total Cholesterol", "HDL", "LDL", "Triglycerides"],
+            "liver": ["ALT", "AST", "Alkaline Phosphatase", "Bilirubin"],
+            "kidney": ["Creatinine", "BUN"],
+            "thyroid": ["TSH", "T4"],
+            "diabetes": ["HbA1c", "Glucose"],
+            "electrolytes": ["Sodium", "Potassium", "Chloride", "Calcium"]
+        },
+        "importance": {
+            "critical": ["Glucose", "Potassium", "Sodium"],
+            "major": ["Hemoglobin", "WBC", "Creatinine"],
+            "standard": ["Cholesterol", "Albumin"]
+        }
     }
 
 def extract_text_from_pdf(file_content):
@@ -61,8 +98,31 @@ def simplify_results(ner_results):
     return tests
 
 def find_closest_match(name, reference_ranges):
-    matches = get_close_matches(name, reference_ranges.keys(), n=1, cutoff=0.7)
-    return matches[0] if matches else None
+    # Convert to lowercase and remove common words/characters for better matching
+    def clean_name(n):
+        return n.lower().replace('(', '').replace(')', '').replace(',', '').strip()
+    
+    name = clean_name(name)
+    matches = {}
+    
+    for ref_name in reference_ranges.keys():
+        ref_clean = clean_name(ref_name)
+        # Check for exact match
+        if name == ref_clean:
+            return ref_name
+        # Check if name is contained in reference name
+        if name in ref_clean or ref_clean in name:
+            matches[ref_name] = len(ref_clean)
+    
+    # Return the closest match if any found
+    if matches:
+        return max(matches.items(), key=lambda x: x[1])[0]
+    
+    # Try fuzzy matching if no direct match found
+    return get_close_matches(name, 
+                           [clean_name(k) for k in reference_ranges.keys()], 
+                           n=1, 
+                           cutoff=0.7)[0]
 
 def evaluate_tests(tests, reference_ranges):
     status = "Good"

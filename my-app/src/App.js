@@ -10,10 +10,10 @@ function App() {
       <div className="App">
         <header className="App-header">
           <div className="header-content">
-            <h1>Blood Test Analyzer</h1>
+            <h1>מנתח בדיקות דם</h1>
             <nav>
-              <a href="/">Analyze</a>
-              <a href="/insights">Insights</a>
+              <a href="/">ניתוח</a>
+              <a href="/insights">תובנות</a>
             </nav>
           </div>
         </header>
