@@ -119,10 +119,13 @@ def find_closest_match(name, reference_ranges):
         return max(matches.items(), key=lambda x: x[1])[0]
     
     # Try fuzzy matching if no direct match found
-    return get_close_matches(name, 
-                           [clean_name(k) for k in reference_ranges.keys()], 
-                           n=1, 
-                           cutoff=0.7)[0]
+    close_matches = get_close_matches(name, 
+                                    [clean_name(k) for k in reference_ranges.keys()], 
+                                    n=1, 
+                                    cutoff=0.6)
+    
+    # Return the first match if found, otherwise return None
+    return reference_ranges.keys()[0] if close_matches else None
 
 def evaluate_tests(tests, reference_ranges):
     status = "Good"
@@ -135,7 +138,7 @@ def evaluate_tests(tests, reference_ranges):
         unit = test.get("Unit", "").strip()
         
         matched_name = find_closest_match(name, reference_ranges)
-        if matched_name:
+        if matched_name and matched_name in reference_ranges:
             ref_range = reference_ranges[matched_name]["range"]
             ref_unit = reference_ranges[matched_name]["unit"]
 
@@ -167,6 +170,8 @@ def evaluate_tests(tests, reference_ranges):
                         })
             except ValueError:
                 print(f"Error parsing value for {name}: {value}")
+        else:
+            print(f"No reference range found for test: {name}")
 
     return {
         "status": status,
